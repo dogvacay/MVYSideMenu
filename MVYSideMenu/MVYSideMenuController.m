@@ -178,6 +178,25 @@ typedef struct {
 	[self closeMenuWithVelocity:0.0f];
 }
 
+- (void)closeMenuWithCompletionAction:(void(^)(void))completionAction {
+    CGFloat finalXOrigin = [self closedOriginX];
+    
+    CGRect frame = self.menuContainerView.frame;
+    frame.origin.x = finalXOrigin;
+    
+    [UIView animateWithDuration:self.options.animationDuration delay:0.0f options:UIViewAnimationOptionCurveEaseInOut animations:^{
+        self.menuContainerView.frame = frame;
+        self.opacityView.layer.opacity = 0.0f;
+        [self.contentContainerView setTransform:CGAffineTransformMakeScale(1.0, 1.0)];
+    } completion:^(BOOL finished) {
+        [self removeMenuShadow];
+        [self enableContentInteraction];
+        if (completionAction) {
+            completionAction();
+        }
+    }];
+}
+
 - (void)openMenu {
 	
 	[self openMenuWithVelocity:0.0f];

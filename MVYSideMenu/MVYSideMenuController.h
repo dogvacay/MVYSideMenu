@@ -45,6 +45,9 @@
 /** Close menu animated. */
 - (void)closeMenu;
 
+/** DogVacay method. Close menu animated and perform action when animation is completed. */
+- (void)closeMenuWithCompletionAction:(void(^)(void))completionAction;
+
 /** Open menu animated. */
 - (void)openMenu;
 
