@@ -9,7 +9,6 @@
 #import "MVYSideMenuController.h"
 #import <QuartzCore/QuartzCore.h>
 
-
 typedef NS_ENUM(NSInteger, MVYSideMenuAction){
 	MVYSideMenuOpen,
 	MVYSideMenuClose
@@ -26,7 +25,7 @@ typedef struct {
 @property (nonatomic, strong) UIViewController *menuViewController;
 @property (nonatomic, strong) UIViewController *contentViewController;
 @property (strong, nonatomic) UIView *contentContainerView;
-@property (strong, nonatomic) UIView *menuContainerView;
+@property (strong, nonatomic) UIWindow *menuContainerWindow;
 @property (strong, nonatomic) UIView *opacityView;
 @property (strong, nonatomic) UIPanGestureRecognizer *panGesture;
 @property (strong, nonatomic) UITapGestureRecognizer *tapGesture;
@@ -113,16 +112,14 @@ typedef struct {
 	
 	_menuFrame = menuFrame;
 	
-	if (_menuContainerView) {
+	if (_menuContainerWindow) {
 		menuFrame.origin.x = - menuFrame.size.width;
-		_menuContainerView.frame = menuFrame;
+		_menuContainerWindow.frame = menuFrame;
 	}
 }
 
 - (void)setMenuViewController:(UIViewController *)menuViewController {
-	
-	[self removeViewController:_menuViewController];
-	
+		
 	_menuViewController = menuViewController;
 	
 	[self setUpMenuViewController:_menuViewController];
@@ -153,21 +150,19 @@ typedef struct {
     return _contentContainerView;
 }
 
-- (UIView *)menuContainerView {
-    if (!_menuContainerView) {
+- (UIWindow *)menuContainerWindow {
+    if (!_menuContainerWindow) {
 		if (CGRectEqualToRect(CGRectZero, self.menuFrame)) {
-			self.menuFrame = CGRectMake(0, 0, self.view.bounds.size.width - 60.0, self.view.bounds.size.height);
+			self.menuFrame = CGRectMake(0, 0, self.view.bounds.size.width-60.f, self.view.bounds.size.height);
 		}
 		CGRect frame = self.menuFrame;
 		frame.origin.x = [self closedOriginX];
-        _menuContainerView = [[UIView alloc] initWithFrame:frame];
-        _menuContainerView.backgroundColor = [UIColor clearColor];
-        _menuContainerView.autoresizingMask = UIViewAutoresizingFlexibleHeight;
-        
-        [self.view insertSubview:_menuContainerView atIndex:2];
+        _menuContainerWindow = [[UIWindow alloc] initWithFrame:frame];
+        _menuContainerWindow.backgroundColor = [UIColor clearColor];
+        _menuContainerWindow.windowLevel = UIWindowLevelStatusBar;
     }
     
-    return _menuContainerView;
+    return _menuContainerWindow;
 }
 
 #pragma mark – Public methods
@@ -181,11 +176,11 @@ typedef struct {
 - (void)closeMenuWithCompletionAction:(void(^)(void))completionAction {
     CGFloat finalXOrigin = [self closedOriginX];
     
-    CGRect frame = self.menuContainerView.frame;
+    CGRect frame = self.menuContainerWindow.frame;
     frame.origin.x = finalXOrigin;
     
     [UIView animateWithDuration:self.options.animationDuration delay:0.0f options:UIViewAnimationOptionCurveEaseInOut animations:^{
-        self.menuContainerView.frame = frame;
+        self.menuContainerWindow.frame = frame;
         self.opacityView.layer.opacity = 0.0f;
         [self.contentContainerView setTransform:CGAffineTransformMakeScale(1.0, 1.0)];
     } completion:^(BOOL finished) {
@@ -239,11 +234,11 @@ typedef struct {
 
 - (void)setUpMenuViewController:(UIViewController *)menuViewController {
 	
-	if (menuViewController) {
-		[self addChildViewController:menuViewController];
-		menuViewController.view.frame = self.menuContainerView.bounds;
-		[self.menuContainerView addSubview:menuViewController.view];
-		[menuViewController didMoveToParentViewController:self];
+    if (menuViewController) {
+        CGRect frame = self.menuContainerWindow.frame;
+        menuViewController.view.frame = frame;
+        self.menuContainerWindow.rootViewController = menuViewController;
+        self.menuContainerWindow.hidden = NO;
 	}
 }
 
@@ -296,7 +291,7 @@ typedef struct {
 	
 	switch (panGesture.state) {
 		case UIGestureRecognizerStateBegan:
-			menuFrameAtStartOfPan = self.menuContainerView.frame;
+			menuFrameAtStartOfPan = self.menuContainerWindow.frame;
 			startPointOfPan = [panGesture locationInView:self.view];
 			menuWasOpenAtStartOfPan = [self isMenuOpen];
 			menuWasHiddenAtStartOfPan = [self isMenuHidden];
@@ -306,7 +301,7 @@ typedef struct {
 			
 		case UIGestureRecognizerStateChanged:{
 			CGPoint translation = [panGesture translationInView:panGesture.view];
-			self.menuContainerView.frame = [self applyTranslation:translation toFrame:menuFrameAtStartOfPan];
+			self.menuContainerWindow.frame = [self applyTranslation:translation toFrame:menuFrameAtStartOfPan];
 			[self applyOpacity];
 			[self applyContentViewScale];
 			break;
@@ -335,7 +330,7 @@ typedef struct {
 	
 	static CGFloat thresholdVelocity = 450.0f;
 	CGFloat pointOfNoReturn = floorf([self closedOriginX] / 2.0f);
-	CGFloat menuOrigin = self.menuContainerView.frame.origin.x;
+	CGFloat menuOrigin = self.menuContainerWindow.frame.origin.x;
 	
 	MVYSideMenuPanResultInfo panInfo = {MVYSideMenuClose, NO, 0.0f};
 	
@@ -353,11 +348,11 @@ typedef struct {
 }
 
 - (BOOL)isMenuOpen {
-	return self.menuContainerView.frame.origin.x == 0.0f;
+	return self.menuContainerWindow.frame.origin.x == 0.0f;
 }
 
 - (BOOL)isMenuHidden {
-	return self.menuContainerView.frame.origin.x <= [self closedOriginX];
+	return self.menuContainerWindow.frame.origin.x <= [self closedOriginX];
 }
 
 - (CGFloat)closedOriginX {
@@ -385,7 +380,7 @@ typedef struct {
 
 - (CGFloat)getOpenedMenuRatio {
 	
-	CGFloat currentPosition = self.menuContainerView.frame.origin.x - [self closedOriginX];
+	CGFloat currentPosition = self.menuContainerWindow.frame.origin.x - [self closedOriginX];
 	return currentPosition / self.menuFrame.size.width;
 }
 
@@ -406,10 +401,10 @@ typedef struct {
 
 - (void)openMenuWithVelocity:(CGFloat)velocity {
 	
-	CGFloat menuXOrigin = self.menuContainerView.frame.origin.x;
+	CGFloat menuXOrigin = self.menuContainerWindow.frame.origin.x;
 	CGFloat finalXOrigin = 0.0f;
 	
-	CGRect frame = self.menuContainerView.frame;
+	CGRect frame = self.menuContainerWindow.frame;
 	frame.origin.x = finalXOrigin;
 	
 	NSTimeInterval duration;
@@ -419,11 +414,11 @@ typedef struct {
 		duration = fabs(menuXOrigin - finalXOrigin) / velocity;
 		duration = fmax(0.1, fmin(1.0f, duration));
 	}
-	
+
 	[self addShadowToMenuView];
 	
 	[UIView animateWithDuration:duration delay:0.0f options:UIViewAnimationOptionCurveEaseInOut animations:^{
-		self.menuContainerView.frame = frame;
+		self.menuContainerWindow.frame = frame;
 		self.opacityView.layer.opacity = self.options.contentViewOpacity;
 		[self.contentContainerView setTransform:CGAffineTransformMakeScale(self.options.contentViewScale, self.options.contentViewScale)];
 	} completion:^(BOOL finished) {
@@ -433,10 +428,10 @@ typedef struct {
 
 - (void)closeMenuWithVelocity:(CGFloat)velocity {
 	
-	CGFloat menuXOrigin = self.menuContainerView.frame.origin.x;
+	CGFloat menuXOrigin = self.menuContainerWindow.frame.origin.x;
 	CGFloat finalXOrigin = [self closedOriginX];
 	
-	CGRect frame = self.menuContainerView.frame;
+	CGRect frame = self.menuContainerWindow.frame;
 	frame.origin.x = finalXOrigin;
 	
 	NSTimeInterval duration;
@@ -448,7 +443,7 @@ typedef struct {
 	}
 	
 	[UIView animateWithDuration:duration delay:0.0f options:UIViewAnimationOptionCurveEaseInOut animations:^{
-		self.menuContainerView.frame = frame;
+		self.menuContainerWindow.frame = frame;
 		self.opacityView.layer.opacity = 0.0f;
 		[self.contentContainerView setTransform:CGAffineTransformMakeScale(1.0, 1.0)];
 	} completion:^(BOOL finished) {
@@ -489,22 +484,22 @@ typedef struct {
 }
 
 - (BOOL)isPointContainedWithinMenuRect:(CGPoint)point {
-	return CGRectContainsPoint(self.menuContainerView.frame, point);
+	return CGRectContainsPoint(self.menuContainerWindow.frame, point);
 }
 
 - (void)addShadowToMenuView {
 	
-	self.menuContainerView.layer.masksToBounds = NO;
-	self.menuContainerView.layer.shadowOffset = self.options.shadowOffset;
-	self.menuContainerView.layer.shadowOpacity = self.options.shadowOpacity;
-    self.menuContainerView.layer.shadowRadius = self.options.shadowRadius;
-	self.menuContainerView.layer.shadowPath = [[UIBezierPath
-                                                 bezierPathWithRect:self.menuContainerView.bounds] CGPath];
+	self.menuContainerWindow.layer.masksToBounds = NO;
+	self.menuContainerWindow.layer.shadowOffset = self.options.shadowOffset;
+	self.menuContainerWindow.layer.shadowOpacity = self.options.shadowOpacity;
+    self.menuContainerWindow.layer.shadowRadius = self.options.shadowRadius;
+	self.menuContainerWindow.layer.shadowPath = [[UIBezierPath
+                                                 bezierPathWithRect:self.menuContainerWindow.bounds] CGPath];
 }
 
 - (void)removeMenuShadow {
 	
-	self.menuContainerView.layer.masksToBounds = YES;
+	self.menuContainerWindow.layer.masksToBounds = YES;
 	self.contentContainerView.layer.opacity = 1.0;
 }
 
