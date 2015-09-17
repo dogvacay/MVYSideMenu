@@ -90,7 +90,7 @@ typedef struct {
     }
 }
 
-- (NSUInteger)supportedInterfaceOrientations {
+- (UIInterfaceOrientationMask)supportedInterfaceOrientations {
     if (self.contentViewController) {
         return [self.contentViewController supportedInterfaceOrientations];
     } else {
